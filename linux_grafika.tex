@@ -1,0 +1,242 @@
+\documentclass{article}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{minted}
+\usepackage{listings}
+\usepackage{parskip}
+\title{Linux grafika od zahteve do prikaza}
+\author{Matic Poženel}
+\date{Junij 2024}
+
+\begin{document}
+\maketitle
+
+\section{Uvod}
+Po predmetu Vgrajeni sistemi sem postal precej navdušen nad programiranju mikroprocesorjev, predvsem zaradi enostavnosti programiranja. Pomnilniško preslikani naslovi omogočajo preprosto interakcijo z vhodno-izhodnimi napravami (V/I napravami) - potrebno je poznati le specifikacijo in pomen bitov v njenih registrih.
+Ob programiranju na višjem nivoju (native aplikacije z grafičnim vmesnikom) se mi je zato začelo porajati vprašanje - zakaj je potrebno za vsak programski jezik mukotrpno iskati grafični vmesnik, ki bi zadovoljil potrebe programerja? Še več - ali bi morda lahko spisal svoj grafični vmesnik, ki bi bil prilagojen mojim potrebam? Konec koncev je za delovanje računalnika zadolžen procesor in ta more na tak ali drugačen način sporočiti zaslonu, naj na koordinati (X,Y) aktivira piksel z neko določeno barvo.
+
+\section{Grafični sklad}
+Grafični sklad je nabor programskih komponent, ki nadzirajo delovanje naprav (npr. gonilniki) in nudijo vmesnik za programiranje (API) z namenom prikaza grafičnih elementov na izhodni napravi.
+Za grafični sklad sicer ni predpisane enotne oblike, a večinoma so plasti, ki ga sestavljajo, razporejene na sledeč način (nivo najbližje strojni opremi je na lestvici najnižje):
+
+\begin{enumerate}
+	\item Aplikacijska plast (Application layer)
+	\item Interoperacijske plasti (Interoperation layer)
+	      \begin{enumerate}[label*=\arabic*.]
+		      \item Plast za nadzor namizja (Desktop Management Layer)
+		      \item Plast za nadzor oken (Window Management Layer)
+	      \end{enumerate}
+	\item Predstavitvene plasti (Presentation Layers)
+	      \begin{enumerate}[label*=\arabic*.]
+		      \item Kompozicijska plast (Compositing Layer)
+		      \item Orodna plast (Widget Toolkit Layer)
+		      \item Upodobitvena plast (Rendering Layer)
+	      \end{enumerate}
+	\item Prikazna plast (Display Layers)
+	      \begin{enumerate}[label*=\arabic*.]
+		      \item Gonilniška plast (Device Driver Layer)
+		      \item Strojna plast (Hardware Layer)
+	      \end{enumerate}
+\end{enumerate}
+
+\subsection{Prikazna plast}
+\subsubsection{Strojna plast}
+V strojni plasti najdemo strojno opremo, torej fizične naprave, ki jih uporabljajo višje plasti
+
+\subsubsection{Gonilniška plast}
+Gonilniška plast vsebuje gonilnike, ki omogočajo delovanje bodisi specifičnih prikaznih naprav (video pomnilnika, GPE, zaslona ipd.), bodisi z neko pomnožico le-teh.
+
+\subsection{Predstavitvene plasti}
+\subsubsection{Upodobitvena plast}
+Splošno pravilo upodobitvene plasti je, da se po nekem algoritmu iz navodil, matematičnih funkcij in podobnih abstraktnih konstruktov pridobi sliko (tj. neko grafično celoto), ki se bo izrisala na zaslon, in sicer prek posebnega programa - upodobitelja. Tu nastane razkorak med 2D in 3D grafiko, saj se je potrebno, na primer, odločiti, s katerim principom se bodo izrisovala okna na zaslon. Čeprav se morda zdi, da bi lahko za vse probleme uporabljali le 3D upodabljanje (saj lahko na 2D gledamo kot na poseben primer 3D), je to računsko veliko bolj intenzivno in se na starejši strojni opremi ne obnese tako dobro, kot klasično 2D upodabljanje.
+
+\subsubsection{Orodna plast}
+Orodna plast večinoma skrbi za izris grafičnih kontrolnih elementov (gumbi, meniji, vnosna polja itd.), ki jih uporablja nadzornik oken. Ta plast je večinoma kar združena z upodobitveno plastjo. Grafični kontrolni elementi pa morajo (večinoma) delovati s kompozitorjem.
+
+\subsubsection{Kompozicijska plast}
+V kompozicijski plasti se nahaja poseben program, imenovan kompozitor, ki skrbi za ustrezno razporeditev (kompozicijo) grafičnih elementov iz spodnjih plasti na zaslonu. Za 2D grafiko to plast nemalokrat kar enači z upodobitveno (z upodobitvene plasti), pri 3D grafiki pa je skoraj obvezna.
+
+\subsection{Medoperacijske plasti}
+\subsubsection{Plast za nadzor oken}
+Grafično procesiranje in prikaz , kot sta bila razložena do te točke, se odvijata tako rekoč na enem platnu, poimenovanem "okno". Upravljalec oken jih lahko izriše več in določi, na katerem se bo prikazala posamezna upodobljena komponenta. Prav tako je zadolžen za razporejanje oken, morebitno prekrivanje ipd.
+Tu se že srečamo z nekoliko bolj poznanimi (tržnimi) imeni, kot so AwesomeWM, qtile, i3wm in drugimi.
+
+\subsubsection{Plast za nadzor namizja}
+Upravljalec namizja je večinoma tista komponenta, na katero pomislimo, ko govorimo o grafičnih uporabniških vmesnikih (GUI-jih). Tudi tu srečamo poznana imena, kot so KDE, Gnome, XFCE, Cinnamon, MATE in drugi.
+
+\subsection{Aplikacijska plast}
+Aplikacijska plast je interna programu samemu.
+
+V operacijskem sistemu Linux
+
+\section{Strojna oprema}
+Brez vhodno/izhodnih (V/I) naprav nam računalniki bore malo koristijo. Če poenostavimo: želimo si imeti nek način vnosa podatkov v pomnilnik, ter nek način pridobivanja podatkov iz pomnilnika tako, da bodo človeku berljivi - to pomeni, da želimo podatke pridobiti v grafični (besedilo, vizualizacije...), zvočni ali pa v kaki drugi, zaenkrat precej futuristični obliki. Ker se v pričujoči predstavitvi osredotočamo na grafično obliko, bomo izmed perifernih naprav zagotovo potrebovali zaslon. Sam način vhoda in izbira vhodnih perifernih naprav za potrebe te predstavitve ni bistvena (razen v določenih delih).
+Vprašanje se torej glasi - kako pripravimo procesor, da nam na zaslon izriše nekaj pikslov? Še bolje: kako to ukažemo Linux jedru[1]?
+
+\subsection{Fizični medpomnilnik okvirjev (frame buffer device)}
+Če preskočimo prikaze, osnovane na znakovnih celicah[2], so Linuxovi sistemi v začetku podpirali medpomnilnike okvirjev (MO, frame buffer). Sprva je bila to fizična naprava, ki je, kot je moč razbrati iz imena, hranila naslednji okvir (sliko oz. polje pikslov), ki se bo izrisal na zaslon v naslednji iteraciji. Tako kot sodobne grafične kartice je bil na napravi vgrajen vmesnik, na katerega je bil preko ustreznega kabla priključen zaslon. Na tej točki v zgodovini so imele uporabniške aplikacije možnost neposrednega pisanja v registre MO - po eni strani so tako oblikovale željen okvir, po drugi strani pa so imele možnost nastavljanja načina delovanja naprave oz. njen \lstinline{mode} (ang. mode-setting). To je imelo nesrečen stranski vpliv - MO je bilo moč poganjati izven njegovih zmožnosti, kar je povzročilo fizično škodo ne le na njem, temveč tudi na zaslonu[3].
+
+\subsection{Grafične procesne enote}
+Uporaba MO pa je bila poleg teh varnostnih hib precej neučinkovit pristop za upodabljanje 3D grafike. Upodabljanje, ki sloni skoraj izključno na linearni algebri (matričnih operacijah), je bilo še vedno prepuščeno procesorju. Tako so se začele pojavljati prve grafične procesne enote (GPE, angl. GPU).
+
+Grafične procesne enote sestojijo iz enakih komponent, kot centralne procesne enote: oboje imajo aritmetično-logične enote, nadzorne enote in več nivojev predpomnilnikov.[4]
+
+Razlikujeta pa se v številu in zmogljivosti posameznih komponent, in nenazadnje seveda v samem namenu. CPE je splošnonamenski - s serijskim izvajanjem lahko stori vse, a morda nekoliko počasneje (npr. množenje matrik). GPE je namenjen predvsem za linearno algebro in paralelno računanje. Sestavljen je iz velikega števila jeder, ki računajo vzporedno druga z drugo. Hitrost grafičnih procesnih enot merimo v številu operacij v plavajoči vejici na sekundo (FLOPS, floating point operations per second), danes navadno v teraflopsih.
+
+\subsection{Grafične kartice}
+GPE je lahko integriran (na istem vezju kot CPE), ali pa je na voljo kot samostojna naprava, ki ji pravimo grafična kartica. Integriran GPE si deli pomnilnik s CPE-jem, grafična kartica pa vsebuje svoj pomnilnik, imenovan video pomnilnik (VRAM), ki je namenjen izključno GPE in se po zasnovi nekoliko razlikuje od SDRAM-a (pogosto je to SGRAM oz. GDDR SDRAM, Graphics double data rate synchronous dynamic random-access memory). Na grafični kartici najdemo še vmesnik, na katerega lahko priključimo zaslon - ta je bil doslej povezan bodisi z MO-jem ali pa matično ploščo.
+
+GPE na VRAM-u shranjuje različne elemente grafičnega upodabljanja (npr. teksture)[5] in pa medpomnilnik okvirjev ter FIFO vrsta ukazov. MO pošilja okvirje na vmesnik za zaslon, uporabniške aplikacije pa izstavljajo ukaze na FIFO vrsto in konfigurirajo napravo.
+
+Na tej točki (v zgodovini in v predstavitvi) še vedno obstaja problem neposrednega dostopa do grafične strojne opreme s strani programov. Tako se lahko zgodi, da v MO piše več aplikacij naenkrat; enako velja za konfiguracijo naprave[6]. Nalogo reševanja tega problema nosi jedro operacijskega sistema.
+
+\section{\textit{Primer}: uporaba virtualnega medpomnilnika okvirjev v Linuxu}
+Ker je MO zastarel in ni več v uporabi, ga danes na sistemih Linux ne uporabljamo več na enak način (tj. vsaj ne z napravo \lstinline{fbdev}[7])[8].
+
+Kljub temu obstaja virtualni medpomnilnik okvirjev (VMO), ki je še vedno uporabljen v današnjih Linux sistemih. S perspektive programerja gre za navadno datoteko oz napravo \lstinline{/dev/fb*}, kjer znak \lstinline{*} ponazarja številko VMO - na večini sodobnih distribucij, kot je na primer Linux Mint, obstaja le \lstinline{/dev/fb0}. Tega lahko tudi kot programerji neposredno uporabimo. Poglejmo si primer na omenjenem operacijskem sistemu.
+Predpogoj za uporabo \lstinline{fb0} je, da se iz grafičnega vmesnika prestavimo v enega izmed teletipkalnikov[9] (teletypewriter). Okenski sistem X ob zagonu namreč prevzame absoluten nadzor nad VMO in nam tako onemogoči neposredno rabo.
+
+Po opravljenem preklopu v na primer \lstinline{tty2} lahko preprosto prevedemo in poženemo naslednjo kodo:[10]
+
+\inputminted{C}{framebuffer_testing.c}
+
+Strukturi \lstinline{fb_fix_screeninfo} in \lstinline{fb_var_screeninfo}[11] nosita fiksne in spremenljive informacije o zaslonu. Fiksne morda niso tako zanimive s perspektive programiranja grafike (so pa morda zanimive s perspektive razvoja operacijskih sistemov[12]), razen polja \lstinline{line_length}, ki nosi število pikslov v eni vrstici. Druga struktura je veliko bolj zanimiva:
+
+
+\begin{minted}{C}
+struct fb_var_screeninfo {
+      __u32 xres;                     /* visible resolution           */
+      __u32 yres;
+      __u32 xres_virtual;             /* virtual resolution           */
+      __u32 yres_virtual;
+      __u32 xoffset;                  /* offset from virtual to visible */
+      __u32 yoffset;                  /* resolution                   */
+
+      __u32 bits_per_pixel;           /* guess what                   */
+      __u32 grayscale;                /* 0 = color, 1 = grayscale,    */
+                                      /* >1 = FOURCC                  */
+      struct fb_bitfield red;         /* bitfield in fb mem if true color, */
+      struct fb_bitfield green;       /* else only length is significant */
+      struct fb_bitfield blue;
+      struct fb_bitfield transp;      /* transparency                 */
+
+      __u32 nonstd;                   /* != 0 Non standard pixel format */
+
+      __u32 activate;                 /* see FB_ACTIVATE_*            */
+
+      __u32 height;                   /* height of picture in mm    */
+      __u32 width;                    /* width of picture in mm     */
+
+      __u32 accel_flags;              /* (OBSOLETE) see fb_info.flags */
+
+      /* Timing: All values in pixclocks, except pixclock (of course) */
+      __u32 pixclock;                 /* pixel clock in ps (pico seconds) */
+      __u32 left_margin;              /* time from sync to picture    */
+      __u32 right_margin;             /* time from picture to sync    */
+      __u32 upper_margin;             /* time from sync to picture    */
+      __u32 lower_margin;
+      __u32 hsync_len;                /* length of horizontal sync    */
+      __u32 vsync_len;                /* length of vertical sync      */
+      __u32 sync;                     /* see FB_SYNC_*                */
+      __u32 vmode;                    /* see FB_VMODE_*               */
+      __u32 rotate;                   /* angle we rotate counter clockwise */
+      __u32 colorspace;               /* colorspace for FOURCC-based modes */
+      __u32 reserved[4];              /* Reserved for future compatibility */
+};
+\end{minted}
+
+Telo funkcije \lstinline{main()} torej pridobi fiksne in spremenljive podatke. Slednji vsebujejo tudi x in y resolucijo zaslona, odmik na x in na y ter število bitov na piskel. Iz tega lahko izračunamo velikost enega okvirja zaslona v bajtih in določimo pomnilniški naslov (v VMO!), kamor bomo v $i$-ti iteraciji postavili $i$-ti piksel. Seveda moramo prej VMO še preslikati v pomnilniški prostor CPE, kar storimo s sistemskim klicem \lstinline{mmap}.
+Sedaj lahko VMO tretiramo kot binarno datoteko - podobno, kot bi tretirali BMP datoteko. V dvojni for zanki se pomikamo piksel za pikslom in vsakič spremenimo količino rdeče, zelene in modre barve (ter prosojnost). Na koncu le čakamo na vnos nekega znaka, da se nam program ne zapre prehitro.
+
+Če si ogledamo še funkcijo \lstinline{get_screeninfo()}, ki pridobi podatke, lahko opazimo, da to stori prek sistemskih klicev \lstinline{ioctl()}. Ti bodo ponovno prišli v upoštev v poglavju DRM in DRI. Za argumente vzamejo datotečni deskriptor, strojno-odvisen ukaz in dodatne argumente (v tem primeru strukturo, kamor se zapišejo pridobljeni podatki.)
+
+\section{Grafični sklad operacijskega sistema Linux}
+Jedro Linux operacijskega sistema nima orodij, ki bi omogočala izris kompleksnih grafičnih elementov na zaslonu, kot so okna, animacije in podobno. To pomeni, da se implementacija grafike razlikuje od distribucije do distribucije. V mnogih, kot so Ubuntu, Mint, openSUSE in Fedora, je določena implementacija grafičnega sklada že vgrajena v samo distribucijo, v lažjih ("lightweight") distribucijah, kot sta Arch in Gentoo, pa mora uporabnik sam dodati gonilnike, upravljalca oken, kompozitor in druge gradnike.
+
+\subsection{Linux jedro in gonilniki naprav}
+
+\subsection{Grafični API}
+Prva komponenta v grafičnem skladu operacijskega sistema Linux je grafični gonilnik, ki ga pogosto imenujemo kar grafični API. Zadolžen je za prevedbo visokonivojskih ukazov, ki so na voljo programerju, v strojno kodo, razumljivo grafičnemu procesorju.
+V to kategorijo spadajo grafični API-ji, kot so OpenGL, Vulkan in Direct3D.
+
+\subsubsection{OpenGL in grafični gonilniki}
+OpenGL in njegova "nadgradnja", Vulkan, sta standarda oz. specifikaciji[14]. V prvi vrsti je namenjen izdelovalcem grafičnih kartic, saj po teh navodilih izdelajo gonilnike za svojo opremo. Tako ne OpenGL-a in Vulkana ne moremo opredeliti kot "knjižnjici", temveč kot "set navodil", katerim zadošča več gonilnikov in implementacij za klienta.
+
+Projekt Nouveau je primer zbirke odprtokodnih gonilnikov za Nvidia grafične kartice izdelanih s pomočjo Gallium3D API-ja. To pomeni, da so vsi Nouveau gonilniki po OpenGL standardu, za dostop do njih pa uporabimo knjižnice na višjih nivojih, kot je Mesa.
+
+\subsubsection{Mesa}
+Mesa je ena izmed bolj poznanih klientskih implementacij OpenGL (in Vulkan) standarda. Gre za dejansko grafično knjižnico, ki deluje z večino gonilnikov današnjih grafičnih kartic. Upravljalca oken X.org in Wayland uporabljata OpenGL standard, zaradi česa oba uporabljata Mesa implementacijo. Prvi ponuja vmesnik med okenskim sistemom X in OpenGL sceno.
+
+\subsubsection{Povezava med upravljalci oken in OpenGL}
+Standard OpenGL je namenjen upodabljanju 2D in 3D grafike in tako ne nudi funkcij za okna. Z uporabo GLX podaljška (GLX extension) okenskega sistema X lahko posamezno OpenGL sceno vežemo na neko X okno. Na Windows sistemih lahko namesto GLX uporabimo vmesnik WGL.
+
+Ker odvisnost od upravljalca oken oteži programiranje prenosljivih aplikacij, so avtorji standarda OpenGL zasnovali še vmesnik EGL, ki povezuje poljubnega upravljalca oken z upodobitvenim API-jem.
+
+\subsection{DRM in DRI}
+Tako OpenGL kot upravljalec oken izdata nek nabor ukazov odvisnih od konkretne GPE. Te je torej potrebno nekako spraviti od programske rešitve do dejanske strojne opreme. Za to skrbi posebna komponenta Linux jedra, neposredni upodobitveni upravljalec (DRM, direct rendering manager), ki prejete ukaze posreduje GPE. Do njega lahko v Linux sistemih dostopamo preko knjižnice \lstinline{libdrm}.
+
+DRM uporablja sistemske klice \lstinline{ioctl}, da alocira pomnilnik in nastavi parametre GPE. Sistemski klici \lstinline{ioctl}[16] so namenjeni za vhodno-izhodne operacije za različne naprave - v tem primeru za GPE.
+
+Visokonivojske aplikacije torej uporabljajo orodje Mesa, ki je zmožno prek knjižnice \lstinline{libdrm} (z uporabo sistemskih klicev) direktno komunicirati z Linuxovim jedrom
+
+Vsaka visokonivojska aplikacija se na orodje Mesa poveže posredno prek okenskega sistema X. Da lahko ta posodobi prikaz, se poveže neposredno z DRM
+DRI je ogrodje, ki večim uporabniškim programom omogoča hkratni dostop do grafične strojne opreme brez povzročanja konfliktov.
+
+\subsubsection{KMS}
+Za vso grafiko, ki ne uporablja upravljalca oken, uporabimo Linuxov Kernel Mode Setting (KMS). Gre za podsistem, ki nam omogoča, da preko \lstinline{libdrm} knjižnice neposredno konfiguriramo strojno opremo prek \lstinline{ioctl} sistemskih klicev. KMS torej uporabimo le v primeru, ko kompozitor in upravljalec oken nista na voljo (npr. zaklenjen zaslon).
+
+\subsection{Okenski sistem X}
+Okenski sistem X (na kratko: X) je odprtokoden okenski sistem, najdemo pa ga na večini današnjih linux sistemov. Organiziran je v zvezo odjemalec-strežnik in tako omogoča tudi oddaljen dostop.
+X je eden izmed najbolj osnovnih gradnikov grafičnih uporabniških vmesnikov, zadolžen pa je tudi za rokovanje z dogodki (event handling) in za olepšave (visual decorations)
+
+\subsubsection{X11}
+X11 je protokol, ki definira izmenjavo sporočil v strežniški arhitekturi sistema X. Če se strežnik in klient nahajata na isti napravi, se sporočila izmenjajo z UNIX vtiči.
+X11 je razširljiv - nove funkcionalnosti lahko dodajamo brez spreminjanja protokola samega.
+
+\subsubsection{\lstinline{Xlib} in \lstinline{XCB}}
+\lstinline{Xlib} (X library) je knjižnica, namenjena implementaciji na strani klienta. Uporabljajo jo druga orodja, kot sta GTK+ in Qt za izdelavo grafičnih vmesnikov za aplikacije.
+
+X.org Foundation danes odsvetuje razvoj aplikacij z neposredno uporabo X knjižnic, temveč priporoča različna orodja (dve omenjeni zgoraj). Za nizko-nivojski razvoj prav tako odsvetujejo uporabo \lstinline{Xlib} knjižnice[17], priporočajo pa njeno "novejšo verzijo" oz. alternativo \lstinline{XCB} (X C Binding). Razlogi so manjša velikost, večja odpornost na napake programerja, boljša podpora za multithreading, več razširitev in nižje latence[18]
+
+\subsubsection{X.org server}
+X.org je strežniška implementacija okenskega sistema X. Strežnik navadno zažene upravljalec prikaza ali pa ga ročno zaženemo prek ukaznega poziva.
+
+\subsection{Cairo}
+Cairo je knjižnica, ki skrbi izključno za izrisovanje vektorske grafike. Podpira tudi izrisovanje na X11 platna preko knjižnice Xlib. Cairo knjižnice večinoma ne uporabljamo neposredno, temveč prek orodij, kot je GTK+.
+
+\subsubsection{Pixman}
+Pixman je deljena knjižnica med X strežnikom in knjižnico Cairo. Nudi algoritme za rasterizacijo, podporo za gradiente in drugo.
+
+\subsection{Kompozitor}
+Kompozitor je program, ki nudi grafične olepšave okenskemu sistemu. To stori z uporabo medpomnilnika oken - vanj za vsakega X klienta shrani vse okvirje, ki jih klient ustvari. Sedaj lahko tem okvirjem doda različne olepšace, kot so sence, prosojnost in zameglitev, tranzicije med okni in celo vertikalna sinhronizacija (V-sync).
+
+\subsection{Wayland}
+Okenski sistem X je že precej star (prva verzija je zaživela leta 1984) in posledično postaja neroden za uporabo, obenem pa njegova zasnova ni varna, saj ne kriptira oz. ne ščiti komunikacij med klientom in strežnikom, kar omogoča prisluškovanje in potencialno razkritje zaupnih informacij.
+
+Wayland je naslednik okenskega sistema X. Gre za komunikacijski protokol, ki na mesto strežnika postavlja kar kompozitor, ki pa igra tudi vlogo upravljalca oken. Tako komunikacija s klienti (uporabniškimi aplikacijami) ne poteka več preko centralnega strežnika, ločenega kompozitorja, od tu nazaj do strežnika in naposled do Linux jedra, temveč klienti komunicirajo direktno s kompozitorjem, ta pa nadalje direktno z jedrom.
+Posledično Wayland omogoča, da menjavo oziroma izbiro med vrsto različnih kompozitorjev, sprogramiranih za to arhitekturo.
+
+Kot je že moč razbrati, Wayland ponuja preprosto nadaljno vzdrževanje, razvijanje in razširjevanje.
+
+\subsubsection{XWayland}
+Zaradi lažje kompatibilnosti v času, ko še vedno prevlada prikazni strežnik X, lahko uporabimo orodje XWayland, ki pod implementacijo Wayland arhitekture vrine še X strežnik in tako omogoči, da novejši protokol uporabijo tudi aplikacije, ki niso namenjene zanj.
+
+\subsection{GUI orodja}
+GUI orodje (tudi GUI knjižnica) vsebuje vse potrebne funkcionalnosti za izdelavo grafičnih uporabniških vmesnikov, kot so rokovalniki dogodkov, prizori (scene) in interaktivni elementi (widgets).
+
+V večini primerov so GUI orodja le ovojne knjižnice nizkonivojskih knjižnic, kot sta Xlib in XCB. Nekateri imajo celo implementirane lastne označevalne jezike, sisteme za dogodke in končne avtomate.
+
+\subsubsection{GTK+}
+GIMP Toolkit je GUI orodje za izdelavo večplatformskih aplikacij z uporabniškim grafičnim vmesnikom.
+
+\subsubsection{Qt}
+Qt je GUI orodje za izdelavo večplatformskih aplikacij z uporabniškim vmesnikom, ki ponuja knjižnico interaktivnih elementov, za razliko od GTK+ orodja pa lahko za izdelavo vmesnikov uporabimo aplikacijo QtDesigner in integrirano razvojno okolje (IDE) QtCreator.
+
+\subsection{Vloga OpenGL-a}
+Čeprav je na tej točki že razvidno, da na Linuxu ne obstaja namensko orodje ali knjižnica za izdelavo uporabniških grafičnih vmesnikov, lahko opazimo, da (prej ali slej) vsi grafični ukazi v Linuxovem grafičnem skladu uporabijo OpenGL. To pomeni, da lahko kot Linuxovo namensko orodje za grafiko uporabimo kar OpenGL. Primer programa, ki deluje na opisan način, je Blender, ki se ne zanaša na nizkonivojske knjižnice ali orodja, temveč ima svojo knjižnico, popolnoma osnovano na standardu OpenGL.
+
+\section{Nekaj primerov}
+
+\section{Viri}
+
+\end{document}
