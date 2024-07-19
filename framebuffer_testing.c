@@ -34,8 +34,8 @@ void get_screeninfo(int *fbfd, struct fb_var_screeninfo *vinfo,
 
 int main() {
     int fbfd = 0;
-    struct fb_var_screeninfo vinfo;  // spremenljive lastnosti #to/do
-    struct fb_fix_screeninfo finfo;   // nespremenljive lastnosti
+    struct fb_var_screeninfo vinfo;  // spremenljive lastnosti
+    struct fb_fix_screeninfo finfo;  // nespremenljive lastnosti
     long int screensize = 0, location = 0;
     unsigned char *fbp = 0;
     int x = 0,
